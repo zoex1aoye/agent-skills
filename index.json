@@ -1,0 +1,12 @@
+{
+  "skills": [
+    {
+      "name": "codebase",
+      "files": [
+        "SKILL.md",
+        "reference/tools.md",
+        "reference/signals.md"
+      ]
+    }
+  ]
+}

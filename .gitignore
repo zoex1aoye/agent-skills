@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# editor
+.vscode/
+.idea/
+
+# keep skill caches out of the repo
+.cache/
