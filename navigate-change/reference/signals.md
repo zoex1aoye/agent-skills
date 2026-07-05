@@ -1,8 +1,10 @@
 # Signal interpretation guide
 
-How to read the raw outputs of Phase 2 (git) and Phase 3 (LSP). The signals only help if you know what they're actually telling you — and what they're *not*.
+How to read the raw outputs of Phase 2 (git) and Phase 3 (structure analysis). The signals only help if you know what they're actually telling you — and what they're *not*.
 
 This guide is language-agnostic. Where examples mention a framework (web framework, ORM, DI), treat it as a placeholder for whatever framework your project actually uses — the stop-expansion and boundary heuristics apply identically regardless of language or framework.
+
+Phase 3 signals may come from LSP (`incomingCalls`, `references`, …) or from grep/read fallback (`rg -w Symbol`, import tracing). The **interpretation** is the same; only the acquisition method differs.
 
 ## Git signals
 
@@ -52,10 +54,10 @@ Git is the highest-signal datasource for legacy code because it records **actual
 **What it tells you:** which implementation is **currently alive**. In a debt-laden project there are usually 2–3 implementations of the same concept (the current one + legacy ones). Churn tells them apart:
 
 - High churn, recent → the **active** path. This is where your change probably goes.
-- Zero churn in 1+ years → **legacy/dead-suspected**. May still be called by dead code paths; confirm with LSP `incomingCalls` in Phase 3.
+- Zero churn in 1+ years → **legacy/dead-suspected**. May still be called by dead code paths; confirm with Phase 3 caller search.
 - Churn that stopped recently (was active, now silent) → likely **superseded**. Look for a replacement that started churning around when this one stopped — that's the handoff point.
 
-**What it does NOT tell you:** importance. A 1-line config file with low churn might be more critical than a 500-line file with high churn. Churn tells you *liveness*, not *centrality* — use LSP for centrality.
+**What it does NOT tell you:** importance. A 1-line config file with low churn might be more critical than a 500-line file with high churn. Churn tells you *liveness*, not *centrality* — use structure analysis for centrality.
 
 ### Recency = the "current truth" anchor
 
@@ -78,20 +80,20 @@ Pair this with blame: `git blame` on the entry-point line tells you *exactly whe
 
 **Don't** blame whole files — it's noise. Just the lines you're about to change.
 
-## LSP signals
+## Structure signals (LSP or grep fallback)
 
-LSP gives you **ground-truth structure** but only for the files you point it at. Its value is precision, not coverage.
+Structure analysis gives you **ground-truth edges** but only for the files/symbols you point it at. Its value is precision, not coverage.
 
-### documentSymbol = the file's contract, fast
+### Symbol surface = the file's contract, fast
 
 Use it to get a file's public surface without reading it. What to look for (adapt "public method" to your language's visibility model — exported functions in Go, `pub` items in Rust, non-underscored members in Python, etc.):
 
 - **Exported/public surface only** → that's the file's real API. Changes should stay within this surface unless you're refactoring.
-- **A symbol named after your concept** (e.g. `verifyToken`, `issue_token`) → that's your entry point for Phase 3 call expansion.
+- **A symbol named after your concept** (e.g. `verifyToken`, `issue_token`) → that's your entry point for Phase 3 expansion.
 - **Many private helpers all named around the concept** → this file is *dedicated* to the concept (high centrality). Promote it in your logical-unit clustering.
 - **One concept symbol buried among 30 unrelated ones** → this file is a god-object; the concept is a tenant, not an owner. Lower centrality, but flag the god-object as a risk (changes here have wide blast radius).
 
-### incomingCalls = blast radius upward
+### Callers / references = blast radius upward
 
 "Who depends on this?" → tells you what breaks if you change this symbol.
 
@@ -99,9 +101,9 @@ Use it to get a file's public surface without reading it. What to look for (adap
 - All callers are in your candidate set → you've found a closed cluster.
 - Callers include framework entry points (web-framework handlers, scheduled jobs, ORM hooks, DI-managed beans) → this is a **leaf of the app**; its upward blast radius ends at the framework. Good — contained.
 - Callers include files **outside** your candidate set → you missed a consumer in Phase 1. Either pull it in (if app-internal) or recognize a boundary (if it's a public API consumed elsewhere).
-- **Zero app-internal callers** → dead code (confirm with `references` to rule out reflection/indirect calls). Demote to dead.
+- **Zero app-internal callers** → dead code (confirm with broader reference search to rule out reflection/indirect calls). Demote to dead.
 
-### outgoingCalls = blast radius downward
+### Callees / imports = blast radius downward
 
 "What does this depend on?" → tells you the change's downstream reach.
 
@@ -111,14 +113,14 @@ Use it to get a file's public surface without reading it. What to look for (adap
 - Callee is a project file but *outside* the candidate set → could be a shared util. Note it, but don't expand unless it owns part of the concept logic. Most shared utils are stable boundaries, not part of the change.
 - Callee is generated code (any `generated/` / `build/` / `.gen.` path convention) → ignore, it regenerates.
 
-### references = the completeness check
+### Reference completeness check
 
-Run on your 1–3 central entry points after `incomingCalls`. `references` is broader (includes non-call usages: type refs, annotations, decorator/macro usage, imports). Use it to catch:
+Run on your 1–3 central entry points after finding direct callers. Reference search is broader (includes non-call usages: type refs, annotations, decorator/macro usage, imports). Use it to catch:
 
-- A usage that isn't a direct call (e.g. a decorator/attribute referencing your verifier, a type reference in a serializer config). These are invisible to `incomingCalls` but are real consumers.
+- A usage that isn't a direct call (e.g. a decorator/attribute referencing your verifier, a type reference in a serializer config). These are invisible to call-graph tools but are real consumers.
 - Test files referencing the symbol → tells you which tests will need updating.
 
-If `references` and `incomingCalls` agree on the app-internal caller set, you're done — the cluster is closed.
+If caller search and reference search agree on the app-internal caller set, you're done — the cluster is closed.
 
 ## Combining signals — the decision matrix
 
@@ -129,7 +131,7 @@ If `references` and `incomingCalls` agree on the app-internal caller set, you're
 | candidate | legacy (no recent churn) | still has app-internal callers | **legacy-but-live** — must change too, or explicitly migrate. Flag as risk. |
 | candidate | dead (no churn, no callers) | no app-internal callers | dead — leave alone, note for cleanup |
 | candidate | active | callers outside candidate set | Phase-1 miss — pull the caller in or treat as boundary |
-| not a candidate | — | but incomingCalls from a survivor | **hidden consumer** — add to candidate set, re-cluster |
+| not a candidate | — | but callers from a survivor | **hidden consumer** — add to candidate set, re-cluster |
 | ≥3 candidates, similar concept-stem | all active, weak co-change among them | similar symbol surfaces | **parallel implementations — run Phase 2b, divergence matrix is the deliverable** |
 
 The last two rows are the self-correcting loop: history and structure can send you back to Phase 1 to pull in files the text search missed. That's the skill working as intended — but cap it: if you loop back more than twice, ask the user for a seed (see SKILL.md "When to bail out and ask").
@@ -138,12 +140,12 @@ The last two rows are the self-correcting loop: history and structure can send y
 
 Without Phase 2, the "History layer says" column is empty. You can only use the Concept + Structure columns, which collapses several verdicts:
 
-- You cannot distinguish `active` from `legacy` from `dead` structurally — `incomingCalls` only tells you *live*, not *recent*. A file with callers might still be legacy-but-live.
-- Co-change-based "logical unit" clustering is unavailable; rely on Phase-3 `outgoingCalls`/`references` edges to group files, which catches *static* coupling but misses *hidden* coupling.
+- You cannot distinguish `active` from `legacy` from `dead` structurally — caller search only tells you *live*, not *recent*. A file with callers might still be legacy-but-live.
+- Co-change-based "logical unit" clustering is unavailable; rely on Phase-3 import/callee edges to group files, which catches *static* coupling but misses *hidden* coupling.
 - Ask the user explicitly about legacy/duplicate implementations (see SKILL.md "Degraded flow"). The decision matrix becomes weaker; the "bail out and ask" path fires more often — that's expected, not a failure.
 
 ## What signals deliberately are NOT used here
 
 - **Embeddings / semantic similarity.** Deliberately excluded. For concept-to-file mapping, naming + git co-change is higher-signal than vector proximity in legacy code, and far cheaper. Embeddings smooth over the exact inconsistencies (3 different implementations of the same concept) that are the whole point.
-- **Full pre-computed call graph.** Too expensive to build upfront, mostly irrelevant to any single change. LSP on-demand on ≤8 survivors gets you the edges that actually matter.
-- **AST-level import analysis at scale.** Imports are a weak signal (everyone imports the standard library). Only useful at Phase 3 to resolve a specific type — `goToDefinition` does that precisely without a full import graph.
+- **Full pre-computed call graph.** Too expensive to build upfront, mostly irrelevant to any single change. On-demand structure analysis on ≤8 survivors gets you the edges that actually matter.
+- **AST-level import analysis at scale.** Imports are a weak signal (everyone imports the standard library). Only useful at Phase 3 to resolve a specific type — definition lookup does that precisely without a full import graph.
