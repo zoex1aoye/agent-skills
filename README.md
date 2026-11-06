@@ -1,18 +1,22 @@
 # agent-skills
 
-Cross-platform agent skills for navigating large or legacy codebases before multi-file changes. Works with **Cursor**, **Claude Code**, **OpenAI Codex**, and **MiMo-Code / OpenCode**.
+Cross-platform agent skills for software-engineering and desktop-environment workflows. Works with **Cursor**, **Claude Code**, **OpenAI Codex**, and **MiMo-Code / OpenCode**.
 
 ## Skills
 
 | Name | What it does |
 |------|-------------|
 | [`navigate-change`](./navigate-change/) | Before a concept-described multi-file edit, locate the right files via sparse grep anchors, git co-change signals, and on-demand structure analysis (LSP when available, grep fallback otherwise). Detects parallel implementations that drift and produces a divergence matrix. |
+| [`xfce-whitesur-desktop`](./xfce-whitesur-desktop/) | Audits and recreates a macOS-like Xfce desktop with WhiteSur, Inter, Labwc Wayland, and native top/bottom Xfce panels. Includes a cloud-desktop baseline and read-only environment audit script. |
 
 ### Why `navigate-change` (not `codebase`)?
 
 The skill is about **navigating to the right edit sites before you change code** — not about understanding the whole codebase. The name matches the trigger ("refactor the auth token flow") and the deliverable (a change navigation artifact), and avoids the generic/overloaded word "codebase".
 
 ## Install
+
+Copy only the skill folders you need. The install examples use
+`<skill-name>` as a placeholder.
 
 ### Cursor
 
@@ -21,42 +25,45 @@ Copy or symlink the skill directory:
 ```bash
 # project-scoped (recommended for teams)
 mkdir -p .cursor/skills
-cp -r navigate-change .cursor/skills/
+cp -r <skill-name> .cursor/skills/
 
 # or global
 mkdir -p ~/.cursor/skills
-cp -r navigate-change ~/.cursor/skills/
+cp -r <skill-name> ~/.cursor/skills/
 ```
 
-Restart the agent session. The skill auto-triggers from its `description`, or invoke explicitly: "use the navigate-change skill".
+Restart the agent session. The skill auto-triggers from its `description`, or
+invoke it explicitly by name.
 
 ### Claude Code
 
 ```bash
 # project-scoped
 mkdir -p .claude/skills
-cp -r navigate-change .claude/skills/
+cp -r <skill-name> .claude/skills/
 
 # or global
 mkdir -p ~/.claude/skills
-cp -r navigate-change ~/.claude/skills/
+cp -r <skill-name> ~/.claude/skills/
 ```
 
-Restart the session. Invoke with `/navigate-change` or let Claude auto-trigger from the description.
+Restart the session. Invoke with `/<skill-name>` or let Claude auto-trigger from
+the description.
 
 ### OpenAI Codex
 
 ```bash
 # project-scoped
 mkdir -p .agents/skills
-cp -r navigate-change .agents/skills/
+cp -r <skill-name> .agents/skills/
 
 # or global
 mkdir -p ~/.agents/skills
-cp -r navigate-change ~/.agents/skills/
+cp -r <skill-name> ~/.agents/skills/
 ```
 
-Restart Codex. Invoke explicitly with `$navigate-change`, or let Codex match implicitly from the description.
+Restart Codex. Invoke explicitly with `$<skill-name>`, or let Codex match
+implicitly from the description.
 
 ### MiMo-Code / OpenCode (URL install)
 
