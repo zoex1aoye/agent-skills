@@ -7,6 +7,8 @@ Cross-platform agent skills for software-engineering and desktop-environment wor
 | Name | What it does |
 |------|-------------|
 | [`navigate-change`](./navigate-change/) | Before a concept-described multi-file edit, locate the right files via sparse grep anchors, git co-change signals, and on-demand structure analysis (LSP when available, grep fallback otherwise). Detects parallel implementations that drift and produces a divergence matrix. |
+| [`deliver-software-change`](./deliver-software-change/) | Adaptive workflow from intent to verified delivery: clarify decisions, write acceptance criteria, slice work, implement and test, run standards/spec review separately, verify observable behavior, and close the change. |
+| [`author-agent-guidance`](./author-agent-guidance/) | Decide whether agent knowledge belongs in always-on instructions, path-scoped rules, task skills, references, scripts, or executable enforcement; includes an audit path for duplication and stale guidance. |
 | [`xfce-whitesur-desktop`](./xfce-whitesur-desktop/) | Audits and recreates a macOS-like Xfce desktop with WhiteSur, Inter, Labwc Wayland, and native top/bottom Xfce panels. Includes a cloud-desktop baseline and read-only environment audit script. |
 
 ### Why `navigate-change` (not `codebase`)?
